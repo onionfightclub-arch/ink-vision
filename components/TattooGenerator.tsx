@@ -101,20 +101,22 @@ const TattooGenerator: React.FC<TattooGeneratorProps> = ({ onSelectDesign }) => 
         <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-black uppercase tracking-[0.2em]">
           <Palette className="w-3.5 h-3.5" /> Style Palette
         </div>
-        <div className="flex overflow-x-auto gap-3 pb-3 no-scrollbar scroll-smooth snap-x">
-          {STYLES.map((style) => (
-            <button
-              key={style}
-              onClick={() => setSelectedStyle(style)}
-              className={`snap-start whitespace-nowrap px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${
-                selectedStyle === style 
-                  ? 'bg-blue-600 border-blue-400 text-white shadow-xl shadow-blue-600/30' 
-                  : 'bg-zinc-800 border-zinc-800 text-zinc-400 hover:border-zinc-700 active:scale-95'
-              }`}
-            >
-              {style}
-            </button>
-          ))}
+        <div className="flex overflow-x-auto gap-3 pb-3 no-scrollbar touch-pan-x">
+          <div className="flex gap-3 pr-4">
+            {STYLES.map((style) => (
+              <button
+                key={style}
+                onClick={() => setSelectedStyle(style)}
+                className={`whitespace-nowrap px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${
+                  selectedStyle === style 
+                    ? 'bg-blue-600 border-blue-400 text-white shadow-xl shadow-blue-600/30' 
+                    : 'bg-zinc-800 border-zinc-800 text-zinc-400 hover:border-zinc-700 active:scale-95'
+                }`}
+              >
+                {style}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -123,18 +125,20 @@ const TattooGenerator: React.FC<TattooGeneratorProps> = ({ onSelectDesign }) => 
         <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-black uppercase tracking-[0.2em]">
           <Zap className="w-3.5 h-3.5 text-yellow-500" /> Flash Presets
         </div>
-        <div className="flex overflow-x-auto gap-3 pb-3 no-scrollbar scroll-smooth snap-x">
-          {PRESETS.map((preset) => (
-            <button
-              key={preset.name}
-              onClick={() => handlePresetClick(preset.prompt)}
-              disabled={isGenerating}
-              className="snap-start flex items-center gap-3 bg-zinc-800/50 border border-zinc-700/50 hover:bg-zinc-800 hover:border-blue-500/50 transition-all px-5 py-3 rounded-2xl active:scale-95 disabled:opacity-50 group"
-            >
-              <span className="text-lg group-hover:scale-125 transition-transform">{preset.icon}</span>
-              <span className="text-[10px] font-black uppercase tracking-widest text-zinc-300">{preset.name}</span>
-            </button>
-          ))}
+        <div className="flex overflow-x-auto gap-3 pb-3 no-scrollbar touch-pan-x">
+          <div className="flex gap-3 pr-4">
+            {PRESETS.map((preset) => (
+              <button
+                key={preset.name}
+                onClick={() => handlePresetClick(preset.prompt)}
+                disabled={isGenerating}
+                className="flex items-center gap-3 bg-zinc-800/50 border border-zinc-700/50 hover:bg-zinc-800 hover:border-blue-500/50 transition-all px-5 py-3 rounded-2xl active:scale-95 disabled:opacity-50 group shrink-0"
+              >
+                <span className="text-lg group-hover:scale-125 transition-transform">{preset.icon}</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-zinc-300">{preset.name}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -184,14 +188,12 @@ const TattooGenerator: React.FC<TattooGeneratorProps> = ({ onSelectDesign }) => 
                 }`} 
               />
               
-              {/* Selection Indicator */}
               {activeDesignId === design.id && (
                 <div className="absolute top-2 right-2 bg-blue-600 rounded-full p-1 shadow-lg">
                   <Check className="w-2.5 h-2.5 text-white stroke-[4px]" />
                 </div>
               )}
 
-              {/* Hover Overlay */}
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all flex flex-col justify-end p-2 md:p-3">
                 <p className="text-[7px] text-blue-400 font-black uppercase tracking-widest mb-1">{design.style}</p>
                 <p className="text-[9px] text-white truncate font-bold uppercase tracking-tighter leading-tight">{design.prompt}</p>

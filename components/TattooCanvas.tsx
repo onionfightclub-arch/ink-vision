@@ -22,7 +22,7 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
-  const [imagesLoaded, setImagesLoaded] = useState(0); // Trigger draw when count changes
+  const [imagesLoaded, setImagesLoaded] = useState(0); 
   
   const images = useRef<{ main: HTMLImageElement | null; tattoo: HTMLImageElement | null }>({
     main: null,
@@ -30,7 +30,14 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
   });
 
   useImperativeHandle(ref, () => ({
-    exportImage: () => canvasRef.current?.toDataURL('image/png') || null
+    exportImage: () => {
+      try {
+        return canvasRef.current?.toDataURL('image/png') || null;
+      } catch (err) {
+        console.error("Canvas export failed. This is usually due to CORS issues with external images.", err);
+        return null;
+      }
+    }
   }));
 
   const draw = useCallback(() => {
@@ -39,7 +46,6 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Use a fixed resolution for consistent drawing
     canvas.width = images.current.main.width;
     canvas.height = images.current.main.height;
     
@@ -48,7 +54,6 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
 
     if (tattooSrc && images.current.tattoo) {
       const tattoo = images.current.tattoo;
-      // Default size relative to canvas width
       const baseWidth = canvas.width * 0.3;
       const width = baseWidth * config.scale;
       const height = (tattoo.height / tattoo.width) * width;
@@ -57,7 +62,6 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
       ctx.globalAlpha = config.opacity;
       ctx.globalCompositeOperation = config.blendMode;
       
-      // Center + offset
       ctx.translate(canvas.width / 2 + config.offsetX, canvas.height / 2 + config.offsetY);
       ctx.rotate((config.rotation * Math.PI) / 180);
       ctx.drawImage(tattoo, -width / 2, -height / 2, width, height);
@@ -65,17 +69,21 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
     }
   }, [tattooSrc, config, imagesLoaded]);
 
-  // Handle image loading separately from drawing
   useEffect(() => {
     let isMounted = true;
     const loadMain = async () => {
       if (!imageSrc) return;
       const img = new Image();
+      img.crossOrigin = "anonymous"; // CRITICAL for export
       img.src = imageSrc;
-      await img.decode();
-      if (isMounted) {
-        images.current.main = img;
-        setImagesLoaded(prev => prev + 1);
+      try {
+        await img.decode();
+        if (isMounted) {
+          images.current.main = img;
+          setImagesLoaded(prev => prev + 1);
+        }
+      } catch (e) {
+        console.error("Failed to load main image", e);
       }
     };
     loadMain();
@@ -91,18 +99,22 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
         return;
       }
       const img = new Image();
+      img.crossOrigin = "anonymous"; // CRITICAL for export
       img.src = tattooSrc;
-      await img.decode();
-      if (isMounted) {
-        images.current.tattoo = img;
-        setImagesLoaded(prev => prev + 1);
+      try {
+        await img.decode();
+        if (isMounted) {
+          images.current.tattoo = img;
+          setImagesLoaded(prev => prev + 1);
+        }
+      } catch (e) {
+        console.error("Failed to load tattoo image", e);
       }
     };
     loadTattoo();
     return () => { isMounted = false; };
   }, [tattooSrc]);
 
-  // Re-draw when images or config change
   useEffect(() => {
     draw();
   }, [draw]);
@@ -120,7 +132,6 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
     
     const rect = canvasRef.current?.getBoundingClientRect();
     if (rect) {
-      // Calculate delta in canvas coordinate space
       const scaleX = canvasRef.current!.width / rect.width;
       const scaleY = canvasRef.current!.height / rect.height;
       onUpdateConfig({

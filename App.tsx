@@ -22,7 +22,11 @@ const App: React.FC = () => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (ev) => setImageSrc(ev.target?.result as string);
+      reader.onload = (ev) => {
+        setImageSrc(ev.target?.result as string);
+        // Reset offsets when new image uploaded
+        setConfig(prev => ({ ...prev, offsetX: 0, offsetY: 0 }));
+      };
       reader.readAsDataURL(file);
     }
   };
@@ -33,7 +37,11 @@ const App: React.FC = () => {
       const link = document.createElement('a');
       link.download = `inkvision-${Date.now()}.png`;
       link.href = dataUrl;
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
+    } else {
+      alert("Failed to export. Please try again or use a different photo.");
     }
   };
 
@@ -67,7 +75,6 @@ const App: React.FC = () => {
       </header>
 
       <main className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-10 md:gap-16 items-start">
-        {/* Step 2 (Canvas) comes first on mobile for better UX */}
         <div className="space-y-6 order-1 lg:order-2">
           <div className="flex items-center gap-3 mb-2 px-1">
             <div className="w-8 h-8 rounded-full bg-blue-600/10 flex items-center justify-center border border-blue-500/20">
@@ -106,7 +113,6 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Step 1 (Generation) */}
         <div className="space-y-6 order-2 lg:order-1">
           <div className="flex items-center gap-3 mb-2 px-1">
             <div className="w-8 h-8 rounded-full bg-blue-600/10 flex items-center justify-center border border-blue-500/20">
@@ -118,7 +124,6 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      {/* Floating Action Button for Export on Mobile */}
       {imageSrc && selectedDesign && (
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black/90 to-transparent lg:static lg:bg-transparent lg:p-0 lg:mt-8 z-50 pb-safe">
           <button 
