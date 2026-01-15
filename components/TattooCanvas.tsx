@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { OverlayConfig, BlendMode } from '../types';
-import { Maximize, RotateCw, Layers, Move, ZoomIn, ZoomOut } from 'lucide-react';
+import { Maximize, RotateCw, Layers, Move, ZoomIn, ZoomOut, Sliders } from 'lucide-react';
 
 interface TattooCanvasProps {
   imageSrc: string;
@@ -62,6 +62,10 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
       ctx.globalAlpha = config.opacity;
       ctx.globalCompositeOperation = config.blendMode;
       
+      // Apply Hue, Saturation, Brightness filters
+      // Note: ctx.filter is supported in all modern browsers.
+      ctx.filter = `hue-rotate(${config.hue}deg) saturate(${config.saturation}%) brightness(${config.brightness}%)`;
+      
       ctx.translate(canvas.width / 2 + config.offsetX, canvas.height / 2 + config.offsetY);
       ctx.rotate((config.rotation * Math.PI) / 180);
       ctx.drawImage(tattoo, -width / 2, -height / 2, width, height);
@@ -74,7 +78,7 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
     const loadMain = async () => {
       if (!imageSrc) return;
       const img = new Image();
-      img.crossOrigin = "anonymous"; // CRITICAL for export
+      img.crossOrigin = "anonymous"; 
       img.src = imageSrc;
       try {
         await img.decode();
@@ -99,7 +103,7 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
         return;
       }
       const img = new Image();
-      img.crossOrigin = "anonymous"; // CRITICAL for export
+      img.crossOrigin = "anonymous"; 
       img.src = tattooSrc;
       try {
         await img.decode();
@@ -173,53 +177,103 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
       </div>
 
       {tattooSrc && (
-        <div className="grid grid-cols-1 gap-5 bg-zinc-900/40 backdrop-blur-xl p-6 rounded-[2rem] border border-zinc-800 shadow-xl">
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <label className="text-[10px] font-black uppercase text-zinc-500 flex items-center gap-2 tracking-[0.2em]">
-                <Maximize className="w-4 h-4 text-blue-500" /> Scale
-              </label>
-              <span className="text-[10px] font-mono text-zinc-400">{(config.scale * 100).toFixed(0)}%</span>
+        <div className="flex flex-col gap-6 bg-zinc-900/40 backdrop-blur-xl p-6 rounded-[2rem] border border-zinc-800 shadow-xl overflow-hidden">
+          {/* Transform Section */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <label className="text-[10px] font-black uppercase text-zinc-500 flex items-center gap-2 tracking-[0.2em]">
+                  <Maximize className="w-4 h-4 text-blue-500" /> Scale
+                </label>
+                <span className="text-[10px] font-mono text-zinc-400">{(config.scale * 100).toFixed(0)}%</span>
+              </div>
+              <div className="flex items-center gap-4">
+                <button 
+                  onClick={() => adjustScale(-0.1)}
+                  className="p-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition-all active:scale-90"
+                >
+                  <ZoomOut className="w-4 h-4 text-zinc-400" />
+                </button>
+                <input 
+                  type="range" min="0.1" max="5" step="0.01" value={config.scale}
+                  onChange={(e) => onUpdateConfig({ scale: parseFloat(e.target.value) })}
+                  className="flex-1 h-2 bg-zinc-800 rounded-full appearance-none cursor-pointer accent-blue-600"
+                />
+                <button 
+                  onClick={() => adjustScale(0.1)}
+                  className="p-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition-all active:scale-90"
+                >
+                  <ZoomIn className="w-4 h-4 text-zinc-400" />
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-4">
-              <button 
-                onClick={() => adjustScale(-0.1)}
-                className="p-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition-all active:scale-90"
-              >
-                <ZoomOut className="w-4 h-4 text-zinc-400" />
-              </button>
+
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <label className="text-[10px] font-black uppercase text-zinc-500 flex items-center gap-2 tracking-[0.2em]">
+                  <RotateCw className="w-4 h-4 text-purple-500" /> Rotate
+                </label>
+                <span className="text-[10px] font-mono text-zinc-400">{config.rotation}°</span>
+              </div>
               <input 
-                type="range" min="0.1" max="5" step="0.01" value={config.scale}
-                onChange={(e) => onUpdateConfig({ scale: parseFloat(e.target.value) })}
-                className="flex-1 h-2 bg-zinc-800 rounded-full appearance-none cursor-pointer accent-blue-600"
+                type="range" min="-180" max="180" value={config.rotation}
+                onChange={(e) => onUpdateConfig({ rotation: parseInt(e.target.value) })}
+                className="w-full h-2 bg-zinc-800 rounded-full appearance-none cursor-pointer accent-purple-600"
               />
-              <button 
-                onClick={() => adjustScale(0.1)}
-                className="p-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition-all active:scale-90"
-              >
-                <ZoomIn className="w-4 h-4 text-zinc-400" />
-              </button>
             </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <label className="text-[10px] font-black uppercase text-zinc-500 flex items-center gap-2 tracking-[0.2em]">
-                <RotateCw className="w-4 h-4 text-purple-500" /> Rotate
-              </label>
-              <span className="text-[10px] font-mono text-zinc-400">{config.rotation}°</span>
+          {/* Color & Filter Section */}
+          <div className="space-y-6 pt-4 border-t border-zinc-800/50">
+            <div className="flex items-center gap-2 mb-2">
+              <Sliders className="w-4 h-4 text-emerald-500" />
+              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Color & Filters</h4>
             </div>
-            <input 
-              type="range" min="-180" max="180" value={config.rotation}
-              onChange={(e) => onUpdateConfig({ rotation: parseInt(e.target.value) })}
-              className="w-full h-2 bg-zinc-800 rounded-full appearance-none cursor-pointer accent-purple-600"
-            />
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <label className="text-[9px] font-black uppercase text-zinc-600 tracking-widest">Hue</label>
+                  <span className="text-[9px] font-mono text-zinc-500">{config.hue}°</span>
+                </div>
+                <input 
+                  type="range" min="0" max="360" value={config.hue}
+                  onChange={(e) => onUpdateConfig({ hue: parseInt(e.target.value) })}
+                  className="w-full h-1.5 bg-zinc-800 rounded-full appearance-none cursor-pointer accent-blue-500"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <label className="text-[9px] font-black uppercase text-zinc-600 tracking-widest">Saturation</label>
+                  <span className="text-[9px] font-mono text-zinc-500">{config.saturation}%</span>
+                </div>
+                <input 
+                  type="range" min="0" max="200" value={config.saturation}
+                  onChange={(e) => onUpdateConfig({ saturation: parseInt(e.target.value) })}
+                  className="w-full h-1.5 bg-zinc-800 rounded-full appearance-none cursor-pointer accent-emerald-500"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <label className="text-[9px] font-black uppercase text-zinc-600 tracking-widest">Brightness</label>
+                  <span className="text-[9px] font-mono text-zinc-500">{config.brightness}%</span>
+                </div>
+                <input 
+                  type="range" min="0" max="200" value={config.brightness}
+                  onChange={(e) => onUpdateConfig({ brightness: parseInt(e.target.value) })}
+                  className="w-full h-1.5 bg-zinc-800 rounded-full appearance-none cursor-pointer accent-yellow-500"
+                />
+              </div>
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 pt-2">
+          {/* Layer Controls */}
+          <div className="grid grid-cols-2 gap-4 pt-4 border-t border-zinc-800/50">
             <div className="space-y-3">
               <label className="text-[10px] font-black uppercase text-zinc-500 tracking-[0.2em] flex items-center gap-2">
-                <Layers className="w-3.5 h-3.5 text-emerald-500" /> Blend
+                <Layers className="w-3.5 h-3.5 text-zinc-400" /> Blend
               </label>
               <select 
                 value={config.blendMode}
@@ -230,6 +284,7 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
                 <option value="normal">Normal</option>
                 <option value="overlay">Overlay</option>
                 <option value="darken">Darken</option>
+                <option value="screen">Screen</option>
               </select>
             </div>
             <div className="space-y-3">

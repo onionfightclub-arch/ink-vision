@@ -60,19 +60,27 @@ const TattooGenerator: React.FC<TattooGeneratorProps> = ({ onSelectDesign }) => 
     if (!finalPrompt.trim() || isGenerating) return;
     
     setIsGenerating(true);
-    const url = await generateTattooDesign(finalPrompt, selectedStyle);
-    
-    if (url) {
-      const newDesign: TattooDesign = {
-        id: Date.now().toString(),
-        url,
-        prompt: finalPrompt,
-        style: selectedStyle
-      };
-      setHistory(prev => [newDesign, ...prev]);
-      handleSelect(newDesign);
+    try {
+      const url = await generateTattooDesign(finalPrompt, selectedStyle);
+      
+      if (url) {
+        const newDesign: TattooDesign = {
+          id: Date.now().toString(),
+          url,
+          prompt: finalPrompt,
+          style: selectedStyle
+        };
+        setHistory(prev => [newDesign, ...prev]);
+        handleSelect(newDesign);
+      } else {
+        alert("Generation failed. Please check your prompt or try again.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("An error occurred during generation.");
+    } finally {
+      setIsGenerating(false);
     }
-    setIsGenerating(false);
   };
 
   const handleSelect = (design: TattooDesign) => {
@@ -82,6 +90,7 @@ const TattooGenerator: React.FC<TattooGeneratorProps> = ({ onSelectDesign }) => 
 
   const handlePresetClick = (presetPrompt: string) => {
     setPrompt(presetPrompt);
+    // Use the preset prompt directly to avoid state lag
     handleGenerate(presetPrompt);
   };
 
@@ -94,20 +103,26 @@ const TattooGenerator: React.FC<TattooGeneratorProps> = ({ onSelectDesign }) => 
           </div>
           <h2 className="text-lg md:text-xl font-black uppercase tracking-tight italic">Design Studio</h2>
         </div>
+        {isGenerating && (
+          <div className="flex items-center gap-2 px-3 py-1 bg-blue-600/20 rounded-full border border-blue-500/30">
+            <Loader2 className="w-3 h-3 text-blue-500 animate-spin" />
+            <span className="text-[10px] font-black uppercase text-blue-500">Working...</span>
+          </div>
+        )}
       </div>
 
-      {/* Style Selector */}
+      {/* Style Palette */}
       <div className="space-y-4">
         <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-black uppercase tracking-[0.2em]">
           <Palette className="w-3.5 h-3.5" /> Style Palette
         </div>
-        <div className="flex overflow-x-auto gap-3 pb-3 no-scrollbar touch-pan-x">
+        <div className="horizontal-scroll custom-scrollbar pb-3">
           <div className="flex gap-3 pr-4">
             {STYLES.map((style) => (
               <button
                 key={style}
                 onClick={() => setSelectedStyle(style)}
-                className={`whitespace-nowrap px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${
+                className={`flex-shrink-0 px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${
                   selectedStyle === style 
                     ? 'bg-blue-600 border-blue-400 text-white shadow-xl shadow-blue-600/30' 
                     : 'bg-zinc-800 border-zinc-800 text-zinc-400 hover:border-zinc-700 active:scale-95'
@@ -120,19 +135,19 @@ const TattooGenerator: React.FC<TattooGeneratorProps> = ({ onSelectDesign }) => 
         </div>
       </div>
 
-      {/* Presets / Flash Art */}
+      {/* Flash Presets */}
       <div className="space-y-4">
         <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-black uppercase tracking-[0.2em]">
           <Zap className="w-3.5 h-3.5 text-yellow-500" /> Flash Presets
         </div>
-        <div className="flex overflow-x-auto gap-3 pb-3 no-scrollbar touch-pan-x">
+        <div className="horizontal-scroll custom-scrollbar pb-3">
           <div className="flex gap-3 pr-4">
             {PRESETS.map((preset) => (
               <button
                 key={preset.name}
                 onClick={() => handlePresetClick(preset.prompt)}
                 disabled={isGenerating}
-                className="flex items-center gap-3 bg-zinc-800/50 border border-zinc-700/50 hover:bg-zinc-800 hover:border-blue-500/50 transition-all px-5 py-3 rounded-2xl active:scale-95 disabled:opacity-50 group shrink-0"
+                className="flex-shrink-0 flex items-center gap-3 bg-zinc-800/50 border border-zinc-700/50 hover:bg-zinc-800 hover:border-blue-500/50 transition-all px-5 py-3 rounded-2xl active:scale-95 disabled:opacity-50 group"
               >
                 <span className="text-lg group-hover:scale-125 transition-transform">{preset.icon}</span>
                 <span className="text-[10px] font-black uppercase tracking-widest text-zinc-300">{preset.name}</span>
@@ -150,7 +165,8 @@ const TattooGenerator: React.FC<TattooGeneratorProps> = ({ onSelectDesign }) => 
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             placeholder={`e.g. A roaring lion with floral accents...`}
-            className="w-full bg-black border-2 border-zinc-800 rounded-3xl p-5 md:p-6 focus:outline-none focus:border-blue-500/50 transition-all min-h-[120px] md:min-h-[140px] text-sm text-zinc-200 resize-none leading-relaxed placeholder:text-zinc-700"
+            disabled={isGenerating}
+            className="w-full bg-black border-2 border-zinc-800 rounded-3xl p-5 md:p-6 focus:outline-none focus:border-blue-500/50 transition-all min-h-[120px] md:min-h-[140px] text-sm text-zinc-200 resize-none leading-relaxed placeholder:text-zinc-700 disabled:opacity-50"
           />
           <button
             onClick={() => handleGenerate()}
@@ -183,6 +199,7 @@ const TattooGenerator: React.FC<TattooGeneratorProps> = ({ onSelectDesign }) => 
               <img 
                 src={design.url} 
                 alt={design.prompt} 
+                crossOrigin="anonymous"
                 className={`w-full h-full object-contain transition-all duration-500 ${
                   activeDesignId === design.id ? 'scale-110' : 'group-hover:scale-105'
                 }`} 

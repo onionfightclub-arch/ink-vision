@@ -15,7 +15,10 @@ const App: React.FC = () => {
     opacity: 0.8,
     offsetX: 0,
     offsetY: 0,
-    blendMode: 'multiply'
+    blendMode: 'multiply',
+    hue: 0,
+    saturation: 100,
+    brightness: 100
   });
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {

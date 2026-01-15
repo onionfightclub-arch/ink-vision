@@ -16,4 +16,7 @@ export interface OverlayConfig {
   offsetX: number;
   offsetY: number;
   blendMode: BlendMode;
+  hue: number;
+  saturation: number;
+  brightness: number;
 }
