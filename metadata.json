@@ -1,0 +1,7 @@
+{
+  "name": "InkVision AI",
+  "description": "Visualize your next tattoo in seconds using AI-powered pose detection and custom tattoo generation.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
