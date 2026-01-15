@@ -32,9 +32,11 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
   useImperativeHandle(ref, () => ({
     exportImage: () => {
       try {
-        return canvasRef.current?.toDataURL('image/png') || null;
+        const canvas = canvasRef.current;
+        if (!canvas) return null;
+        return canvas.toDataURL('image/png');
       } catch (err) {
-        console.error("Canvas export failed. This is usually due to CORS issues with external images.", err);
+        console.error("Canvas export failed. Ensure all images are CORS-accessible.", err);
         return null;
       }
     }
@@ -46,12 +48,19 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Use intrinsic size of the background image
     canvas.width = images.current.main.width;
     canvas.height = images.current.main.height;
     
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw background
+    ctx.filter = 'none';
+    ctx.globalAlpha = 1.0;
+    ctx.globalCompositeOperation = 'source-over';
     ctx.drawImage(images.current.main, 0, 0);
 
+    // Draw tattoo overlay
     if (tattooSrc && images.current.tattoo) {
       const tattoo = images.current.tattoo;
       const baseWidth = canvas.width * 0.3;
@@ -63,13 +72,15 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
       ctx.globalCompositeOperation = config.blendMode;
       
       // Apply Hue, Saturation, Brightness filters
-      // Note: ctx.filter is supported in all modern browsers.
       ctx.filter = `hue-rotate(${config.hue}deg) saturate(${config.saturation}%) brightness(${config.brightness}%)`;
       
       ctx.translate(canvas.width / 2 + config.offsetX, canvas.height / 2 + config.offsetY);
       ctx.rotate((config.rotation * Math.PI) / 180);
       ctx.drawImage(tattoo, -width / 2, -height / 2, width, height);
+      
       ctx.restore();
+      // Explicitly reset filter after restore for cross-browser safety
+      ctx.filter = 'none';
     }
   }, [tattooSrc, config, imagesLoaded]);
 
@@ -87,7 +98,7 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
           setImagesLoaded(prev => prev + 1);
         }
       } catch (e) {
-        console.error("Failed to load main image", e);
+        console.error("Main image failed to decode", e);
       }
     };
     loadMain();
@@ -112,7 +123,7 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
           setImagesLoaded(prev => prev + 1);
         }
       } catch (e) {
-        console.error("Failed to load tattoo image", e);
+        console.error("Tattoo image failed to decode", e);
       }
     };
     loadTattoo();
@@ -164,20 +175,20 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
         style={{ touchAction: 'none' }}
         className={`relative aspect-square w-full bg-zinc-950 rounded-[2rem] overflow-hidden border border-zinc-800 transition-all ${
           isDragging ? 'scale-[0.99] ring-2 ring-blue-500/50' : 'shadow-2xl'
-        } flex items-center justify-center`}
+        } flex items-center justify-center cursor-move`}
       >
         <canvas ref={canvasRef} className="w-full h-full object-contain pointer-events-none" />
         
         {tattooSrc && !isDragging && (
           <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-2 pointer-events-none border border-white/10 shadow-lg">
             <Move className="w-3 h-3 text-blue-400" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-white">Drag to position</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-white">Position Adjusted</span>
           </div>
         )}
       </div>
 
       {tattooSrc && (
-        <div className="flex flex-col gap-6 bg-zinc-900/40 backdrop-blur-xl p-6 rounded-[2rem] border border-zinc-800 shadow-xl overflow-hidden">
+        <div className="flex flex-col gap-6 bg-zinc-900/40 backdrop-blur-xl p-6 rounded-[2rem] border border-zinc-800 shadow-xl">
           {/* Transform Section */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
