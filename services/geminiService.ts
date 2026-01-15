@@ -37,7 +37,9 @@ export const generateTattooDesign = async (prompt: string, style: TattooStyle = 
     if (response.candidates?.[0]?.content?.parts) {
       for (const part of response.candidates[0].content.parts) {
         if (part.inlineData) {
-          return `data:image/png;base64,${part.inlineData.data}`;
+          // Correctly handle the MIME type returned by the API
+          const mimeType = part.inlineData.mimeType || 'image/png';
+          return `data:${mimeType};base64,${part.inlineData.data}`;
         }
       }
     }
