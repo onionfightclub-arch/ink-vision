@@ -42,27 +42,50 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
     }
   }));
 
+  // Handle high-DPI scaling (DPR) on display and resize
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const setupCanvas = () => {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      
+      // Set internal size to match physical pixels
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        // Clear transformations before scale
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.scale(dpr, dpr);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+      }
+      
+      // Request a redraw whenever the canvas size or DPR changes
+      setImagesLoaded(prev => prev + 1); 
+    };
+
+    setupCanvas();
+    window.addEventListener('resize', setupCanvas);
+    return () => window.removeEventListener('resize', setupCanvas);
+  }, [imageSrc]); // Re-run when base image changes
+
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas || !images.current.main) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return;
 
-    // Adjust canvas resolution for high-DPI
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    ctx.save();
-    ctx.scale(dpr, dpr);
-
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
+    // We don't clear transformations here because the useEffect handles scaling
+    // but we do need to clear the content for redrawing
+    const dpr = window.devicePixelRatio || 1;
+    ctx.clearRect(0, 0, rect.width, rect.height);
     
     // Draw background
     const bg = images.current.main;
@@ -94,7 +117,6 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
       ctx.globalAlpha = config.opacity;
       ctx.globalCompositeOperation = config.blendMode;
       
-      // Apply CSS-like filters on the canvas context
       ctx.filter = `hue-rotate(${config.hue}deg) saturate(${config.saturation}%) brightness(${config.brightness}%)`;
       
       ctx.translate(rect.width / 2 + config.offsetX, rect.height / 2 + config.offsetY);
@@ -103,9 +125,6 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
       
       ctx.restore();
     }
-
-    ctx.restore();
-    ctx.filter = 'none';
   }, [tattooSrc, config, imagesLoaded]);
 
   useEffect(() => {
@@ -156,8 +175,6 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
 
   useEffect(() => {
     draw();
-    window.addEventListener('resize', draw);
-    return () => window.removeEventListener('resize', draw);
   }, [draw]);
 
   const handleStart = (clientX: number, clientY: number) => {
@@ -203,7 +220,7 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
         {tattooSrc && !isDragging && (
           <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-2 pointer-events-none border border-white/10 shadow-lg">
             <Move className="w-3 h-3 text-blue-400" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-white">Manual Placement Mode</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-white">Interactive Placement</span>
           </div>
         )}
       </div>
@@ -236,7 +253,7 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <label className="text-[10px] font-black uppercase text-zinc-500 flex items-center gap-2 tracking-[0.2em]">
-                  <RotateCw className="w-4 h-4 text-purple-500" /> Rotate
+                  <RotateCw className="w-4 h-4 text-purple-500" /> Rotation
                 </label>
                 <span className="text-[10px] font-mono text-zinc-400">{config.rotation}°</span>
               </div>
@@ -251,7 +268,7 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
           <div className="space-y-6 pt-4 border-t border-zinc-800/50">
             <div className="flex items-center gap-2 mb-2">
               <Sliders className="w-4 h-4 text-emerald-500" />
-              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Color Filters</h4>
+              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Appearance</h4>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -294,14 +311,14 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
           <div className="grid grid-cols-2 gap-4 pt-4 border-t border-zinc-800/50">
             <div className="space-y-3">
               <label className="text-[10px] font-black uppercase text-zinc-500 tracking-[0.2em] flex items-center gap-2">
-                <Layers className="w-3.5 h-3.5 text-zinc-400" /> Blend
+                <Layers className="w-3.5 h-3.5 text-zinc-400" /> Blending Mode
               </label>
               <select 
                 value={config.blendMode}
                 onChange={(e) => onUpdateConfig({ blendMode: e.target.value as BlendMode })}
                 className="w-full bg-black/40 border border-zinc-800 rounded-2xl p-3 text-[10px] font-black uppercase tracking-wider focus:ring-2 focus:ring-blue-500 outline-none appearance-none cursor-pointer text-zinc-300"
               >
-                <option value="multiply">Multiply (Ink on Skin)</option>
+                <option value="multiply">Multiply (Stencil)</option>
                 <option value="normal">Normal</option>
                 <option value="overlay">Overlay</option>
                 <option value="darken">Darken</option>
