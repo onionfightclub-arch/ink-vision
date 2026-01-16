@@ -48,40 +48,69 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Use intrinsic size of the background image
-    canvas.width = images.current.main.width;
-    canvas.height = images.current.main.height;
-    
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+
+    // Fix blurry canvas on high-DPI screens
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Draw background
-    ctx.filter = 'none';
-    ctx.globalAlpha = 1.0;
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.drawImage(images.current.main, 0, 0);
+    // Scale context so drawing commands use CSS pixels
+    ctx.save();
+    ctx.scale(dpr, dpr);
+
+    // Improve image quality
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    
+    // Draw background (scaled to fit container)
+    const bg = images.current.main;
+    const bgRatio = bg.width / bg.height;
+    const canvasRatio = rect.width / rect.height;
+    
+    let drawWidth = rect.width;
+    let drawHeight = rect.height;
+
+    // Center background image using "contain" logic for display
+    if (bgRatio > canvasRatio) {
+      drawHeight = rect.width / bgRatio;
+    } else {
+      drawWidth = rect.height * bgRatio;
+    }
+
+    const startX = (rect.width - drawWidth) / 2;
+    const startY = (rect.height - drawHeight) / 2;
+
+    ctx.drawImage(bg, startX, startY, drawWidth, drawHeight);
 
     // Draw tattoo overlay
     if (tattooSrc && images.current.tattoo) {
       const tattoo = images.current.tattoo;
-      const baseWidth = canvas.width * 0.3;
-      const width = baseWidth * config.scale;
+      // Base width relative to the container
+      const baseSize = Math.min(rect.width, rect.height) * 0.4;
+      const width = baseSize * config.scale;
       const height = (tattoo.height / tattoo.width) * width;
 
       ctx.save();
       ctx.globalAlpha = config.opacity;
       ctx.globalCompositeOperation = config.blendMode;
       
-      // Apply Hue, Saturation, Brightness filters
+      // Apply filters
       ctx.filter = `hue-rotate(${config.hue}deg) saturate(${config.saturation}%) brightness(${config.brightness}%)`;
       
-      ctx.translate(canvas.width / 2 + config.offsetX, canvas.height / 2 + config.offsetY);
+      // Translate relative to center of container
+      ctx.translate(rect.width / 2 + config.offsetX, rect.height / 2 + config.offsetY);
       ctx.rotate((config.rotation * Math.PI) / 180);
       ctx.drawImage(tattoo, -width / 2, -height / 2, width, height);
       
       ctx.restore();
-      // Explicitly reset filter after restore for cross-browser safety
-      ctx.filter = 'none';
     }
+
+    ctx.restore();
+    // Final check for high-DPI cross-browser safety
+    ctx.filter = 'none';
   }, [tattooSrc, config, imagesLoaded]);
 
   useEffect(() => {
@@ -132,6 +161,10 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
 
   useEffect(() => {
     draw();
+    
+    // Add resize listener to keep canvas sharp on window resize
+    window.addEventListener('resize', draw);
+    return () => window.removeEventListener('resize', draw);
   }, [draw]);
 
   const handleStart = (clientX: number, clientY: number) => {
@@ -145,15 +178,11 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
     const dx = clientX - lastMousePos.x;
     const dy = clientY - lastMousePos.y;
     
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (rect) {
-      const scaleX = canvasRef.current!.width / rect.width;
-      const scaleY = canvasRef.current!.height / rect.height;
-      onUpdateConfig({
-        offsetX: config.offsetX + dx * scaleX,
-        offsetY: config.offsetY + dy * scaleY
-      });
-    }
+    // On-screen offsets are kept in CSS pixels
+    onUpdateConfig({
+      offsetX: config.offsetX + dx,
+      offsetY: config.offsetY + dy
+    });
     setLastMousePos({ x: clientX, y: clientY });
   };
 
@@ -182,7 +211,7 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
         {tattooSrc && !isDragging && (
           <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-2 pointer-events-none border border-white/10 shadow-lg">
             <Move className="w-3 h-3 text-blue-400" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-white">Position Adjusted</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-white">Precise Placement</span>
           </div>
         )}
       </div>
