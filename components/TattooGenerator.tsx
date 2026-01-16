@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Sparkles, Loader2, Search, Palette, Zap, Check } from 'lucide-react';
+import React, { useState, KeyboardEvent } from 'react';
+import { Sparkles, Loader2, Search, Palette, Zap, Check, AlertCircle } from 'lucide-react';
 import { generateTattooDesign } from '../services/geminiService';
 import { TattooDesign, TattooStyle } from '../types';
 
@@ -32,6 +32,7 @@ const TattooGenerator: React.FC<TattooGeneratorProps> = ({ onSelectDesign }) => 
   const [prompt, setPrompt] = useState('');
   const [selectedStyle, setSelectedStyle] = useState<TattooStyle>('Fine Line');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [activeDesignId, setActiveDesignId] = useState<string | null>(null);
   
   const [history, setHistory] = useState<TattooDesign[]>([
@@ -60,6 +61,7 @@ const TattooGenerator: React.FC<TattooGeneratorProps> = ({ onSelectDesign }) => 
     if (!finalPrompt.trim() || isGenerating) return;
     
     setIsGenerating(true);
+    setError(null);
     try {
       const url = await generateTattooDesign(finalPrompt, selectedStyle);
       
@@ -73,11 +75,11 @@ const TattooGenerator: React.FC<TattooGeneratorProps> = ({ onSelectDesign }) => 
         setHistory(prev => [newDesign, ...prev]);
         handleSelect(newDesign);
       } else {
-        alert("Generation failed. Please check your prompt or try again.");
+        setError("Neural generation failed. Try a more descriptive prompt.");
       }
     } catch (err) {
       console.error(err);
-      alert("An error occurred during generation.");
+      setError("An unexpected error occurred. Please try again.");
     } finally {
       setIsGenerating(false);
     }
@@ -90,8 +92,14 @@ const TattooGenerator: React.FC<TattooGeneratorProps> = ({ onSelectDesign }) => 
 
   const handlePresetClick = (presetPrompt: string) => {
     setPrompt(presetPrompt);
-    // Use the preset prompt directly to avoid state lag
     handleGenerate(presetPrompt);
+  };
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      handleGenerate();
+    }
   };
 
   return (
@@ -116,7 +124,7 @@ const TattooGenerator: React.FC<TattooGeneratorProps> = ({ onSelectDesign }) => 
         <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-black uppercase tracking-[0.2em]">
           <Palette className="w-3.5 h-3.5" /> Style Palette
         </div>
-        <div className="horizontal-scroll custom-scrollbar pb-3">
+        <div className="horizontal-scroll no-scrollbar pb-3">
           <div className="flex gap-3 pr-4">
             {STYLES.map((style) => (
               <button
@@ -140,7 +148,7 @@ const TattooGenerator: React.FC<TattooGeneratorProps> = ({ onSelectDesign }) => 
         <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-black uppercase tracking-[0.2em]">
           <Zap className="w-3.5 h-3.5 text-yellow-500" /> Flash Presets
         </div>
-        <div className="horizontal-scroll custom-scrollbar pb-3">
+        <div className="horizontal-scroll no-scrollbar pb-3">
           <div className="flex gap-3 pr-4">
             {PRESETS.map((preset) => (
               <button
@@ -159,11 +167,15 @@ const TattooGenerator: React.FC<TattooGeneratorProps> = ({ onSelectDesign }) => 
 
       {/* Input Area */}
       <div className="space-y-4">
-        <label className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.2em]">Describe your concept</label>
+        <div className="flex justify-between items-center">
+          <label className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.2em]">Describe your concept</label>
+          <span className="text-[8px] text-zinc-700 font-bold uppercase tracking-widest hidden md:inline">⌘ + Enter to generate</span>
+        </div>
         <div className="relative group">
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder={`e.g. A roaring lion with floral accents...`}
             disabled={isGenerating}
             className="w-full bg-black border-2 border-zinc-800 rounded-3xl p-5 md:p-6 focus:outline-none focus:border-blue-500/50 transition-all min-h-[120px] md:min-h-[140px] text-sm text-zinc-200 resize-none leading-relaxed placeholder:text-zinc-700 disabled:opacity-50"
@@ -176,6 +188,12 @@ const TattooGenerator: React.FC<TattooGeneratorProps> = ({ onSelectDesign }) => 
             {isGenerating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
           </button>
         </div>
+        {error && (
+          <div className="flex items-center gap-2 text-red-400 bg-red-400/10 p-4 rounded-2xl border border-red-400/20 animate-in fade-in slide-in-from-top-2">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            <p className="text-[10px] font-black uppercase tracking-widest">{error}</p>
+          </div>
+        )}
       </div>
 
       {/* History Grid */}
@@ -206,7 +224,7 @@ const TattooGenerator: React.FC<TattooGeneratorProps> = ({ onSelectDesign }) => 
               />
               
               {activeDesignId === design.id && (
-                <div className="absolute top-2 right-2 bg-blue-600 rounded-full p-1 shadow-lg">
+                <div className="absolute top-2 right-2 bg-blue-600 rounded-full p-1 shadow-lg z-10">
                   <Check className="w-2.5 h-2.5 text-white stroke-[4px]" />
                 </div>
               )}

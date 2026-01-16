@@ -20,6 +20,7 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
   onUpdateConfig
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
   const [imagesLoaded, setImagesLoaded] = useState(0); 
@@ -34,6 +35,7 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
       try {
         const canvas = canvasRef.current;
         if (!canvas) return null;
+        // When exporting, we might want to export at full resolution or at the current scaled resolution
         return canvas.toDataURL('image/png');
       } catch (err) {
         console.error("Canvas export failed. Ensure all images are CORS-accessible.", err);
@@ -50,6 +52,9 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
 
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
+    
+    // Safety check for zero dimensions (could happen during initial render or if hidden)
+    if (rect.width === 0 || rect.height === 0) return;
 
     // Fix blurry canvas on high-DPI screens
     canvas.width = rect.width * dpr;
@@ -73,7 +78,7 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
     let drawWidth = rect.width;
     let drawHeight = rect.height;
 
-    // Center background image using "contain" logic for display
+    // "Contain" logic to fit background properly
     if (bgRatio > canvasRatio) {
       drawHeight = rect.width / bgRatio;
     } else {
@@ -88,7 +93,7 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
     // Draw tattoo overlay
     if (tattooSrc && images.current.tattoo) {
       const tattoo = images.current.tattoo;
-      // Base width relative to the container
+      // Base size relative to the visible area
       const baseSize = Math.min(rect.width, rect.height) * 0.4;
       const width = baseSize * config.scale;
       const height = (tattoo.height / tattoo.width) * width;
@@ -100,7 +105,7 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
       // Apply filters
       ctx.filter = `hue-rotate(${config.hue}deg) saturate(${config.saturation}%) brightness(${config.brightness}%)`;
       
-      // Translate relative to center of container
+      // Translate relative to center of the visual container
       ctx.translate(rect.width / 2 + config.offsetX, rect.height / 2 + config.offsetY);
       ctx.rotate((config.rotation * Math.PI) / 180);
       ctx.drawImage(tattoo, -width / 2, -height / 2, width, height);
@@ -162,9 +167,12 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
   useEffect(() => {
     draw();
     
-    // Add resize listener to keep canvas sharp on window resize
-    window.addEventListener('resize', draw);
-    return () => window.removeEventListener('resize', draw);
+    const handleResize = () => {
+      requestAnimationFrame(draw);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, [draw]);
 
   const handleStart = (clientX: number, clientY: number) => {
@@ -194,6 +202,7 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
   return (
     <div className="flex flex-col gap-4">
       <div 
+        ref={containerRef}
         onMouseDown={(e) => handleStart(e.clientX, e.clientY)}
         onMouseMove={(e) => handleMove(e.clientX, e.clientY)}
         onMouseUp={() => setIsDragging(false)}
