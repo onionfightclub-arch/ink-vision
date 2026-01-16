@@ -20,7 +20,6 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
   onUpdateConfig
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
   const [imagesLoaded, setImagesLoaded] = useState(0); 
@@ -35,10 +34,9 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
       try {
         const canvas = canvasRef.current;
         if (!canvas) return null;
-        // When exporting, we might want to export at full resolution or at the current scaled resolution
         return canvas.toDataURL('image/png');
       } catch (err) {
-        console.error("Canvas export failed. Ensure all images are CORS-accessible.", err);
+        console.error("Canvas export failed:", err);
         return null;
       }
     }
@@ -52,25 +50,21 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
 
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
-    
-    // Safety check for zero dimensions (could happen during initial render or if hidden)
     if (rect.width === 0 || rect.height === 0) return;
 
-    // Fix blurry canvas on high-DPI screens
+    // Adjust canvas resolution for high-DPI
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Scale context so drawing commands use CSS pixels
     ctx.save();
     ctx.scale(dpr, dpr);
 
-    // Improve image quality
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
     
-    // Draw background (scaled to fit container)
+    // Draw background
     const bg = images.current.main;
     const bgRatio = bg.width / bg.height;
     const canvasRatio = rect.width / rect.height;
@@ -78,7 +72,6 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
     let drawWidth = rect.width;
     let drawHeight = rect.height;
 
-    // "Contain" logic to fit background properly
     if (bgRatio > canvasRatio) {
       drawHeight = rect.width / bgRatio;
     } else {
@@ -93,7 +86,6 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
     // Draw tattoo overlay
     if (tattooSrc && images.current.tattoo) {
       const tattoo = images.current.tattoo;
-      // Base size relative to the visible area
       const baseSize = Math.min(rect.width, rect.height) * 0.4;
       const width = baseSize * config.scale;
       const height = (tattoo.height / tattoo.width) * width;
@@ -102,10 +94,9 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
       ctx.globalAlpha = config.opacity;
       ctx.globalCompositeOperation = config.blendMode;
       
-      // Apply filters
+      // Apply CSS-like filters on the canvas context
       ctx.filter = `hue-rotate(${config.hue}deg) saturate(${config.saturation}%) brightness(${config.brightness}%)`;
       
-      // Translate relative to center of the visual container
       ctx.translate(rect.width / 2 + config.offsetX, rect.height / 2 + config.offsetY);
       ctx.rotate((config.rotation * Math.PI) / 180);
       ctx.drawImage(tattoo, -width / 2, -height / 2, width, height);
@@ -114,7 +105,6 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
     }
 
     ctx.restore();
-    // Final check for high-DPI cross-browser safety
     ctx.filter = 'none';
   }, [tattooSrc, config, imagesLoaded]);
 
@@ -132,7 +122,7 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
           setImagesLoaded(prev => prev + 1);
         }
       } catch (e) {
-        console.error("Main image failed to decode", e);
+        console.error("Main image load failed", e);
       }
     };
     loadMain();
@@ -157,7 +147,7 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
           setImagesLoaded(prev => prev + 1);
         }
       } catch (e) {
-        console.error("Tattoo image failed to decode", e);
+        console.error("Tattoo image load failed", e);
       }
     };
     loadTattoo();
@@ -166,13 +156,8 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
 
   useEffect(() => {
     draw();
-    
-    const handleResize = () => {
-      requestAnimationFrame(draw);
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener('resize', draw);
+    return () => window.removeEventListener('resize', draw);
   }, [draw]);
 
   const handleStart = (clientX: number, clientY: number) => {
@@ -186,7 +171,6 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
     const dx = clientX - lastMousePos.x;
     const dy = clientY - lastMousePos.y;
     
-    // On-screen offsets are kept in CSS pixels
     onUpdateConfig({
       offsetX: config.offsetX + dx,
       offsetY: config.offsetY + dy
@@ -202,7 +186,6 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
   return (
     <div className="flex flex-col gap-4">
       <div 
-        ref={containerRef}
         onMouseDown={(e) => handleStart(e.clientX, e.clientY)}
         onMouseMove={(e) => handleMove(e.clientX, e.clientY)}
         onMouseUp={() => setIsDragging(false)}
@@ -220,14 +203,13 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
         {tattooSrc && !isDragging && (
           <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-2 pointer-events-none border border-white/10 shadow-lg">
             <Move className="w-3 h-3 text-blue-400" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-white">Precise Placement</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-white">Manual Placement Mode</span>
           </div>
         )}
       </div>
 
       {tattooSrc && (
         <div className="flex flex-col gap-6 bg-zinc-900/40 backdrop-blur-xl p-6 rounded-[2rem] border border-zinc-800 shadow-xl">
-          {/* Transform Section */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
               <div className="flex justify-between items-center">
@@ -237,10 +219,7 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
                 <span className="text-[10px] font-mono text-zinc-400">{(config.scale * 100).toFixed(0)}%</span>
               </div>
               <div className="flex items-center gap-4">
-                <button 
-                  onClick={() => adjustScale(-0.1)}
-                  className="p-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition-all active:scale-90"
-                >
+                <button onClick={() => adjustScale(-0.1)} className="p-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition-all active:scale-90">
                   <ZoomOut className="w-4 h-4 text-zinc-400" />
                 </button>
                 <input 
@@ -248,10 +227,7 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
                   onChange={(e) => onUpdateConfig({ scale: parseFloat(e.target.value) })}
                   className="flex-1 h-2 bg-zinc-800 rounded-full appearance-none cursor-pointer accent-blue-600"
                 />
-                <button 
-                  onClick={() => adjustScale(0.1)}
-                  className="p-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition-all active:scale-90"
-                >
+                <button onClick={() => adjustScale(0.1)} className="p-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition-all active:scale-90">
                   <ZoomIn className="w-4 h-4 text-zinc-400" />
                 </button>
               </div>
@@ -272,11 +248,10 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
             </div>
           </div>
 
-          {/* Color & Filter Section */}
           <div className="space-y-6 pt-4 border-t border-zinc-800/50">
             <div className="flex items-center gap-2 mb-2">
               <Sliders className="w-4 h-4 text-emerald-500" />
-              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Color & Filters</h4>
+              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Color Filters</h4>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -291,7 +266,6 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
                   className="w-full h-1.5 bg-zinc-800 rounded-full appearance-none cursor-pointer accent-blue-500"
                 />
               </div>
-
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <label className="text-[9px] font-black uppercase text-zinc-600 tracking-widest">Saturation</label>
@@ -303,7 +277,6 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
                   className="w-full h-1.5 bg-zinc-800 rounded-full appearance-none cursor-pointer accent-emerald-500"
                 />
               </div>
-
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <label className="text-[9px] font-black uppercase text-zinc-600 tracking-widest">Brightness</label>
@@ -318,7 +291,6 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
             </div>
           </div>
 
-          {/* Layer Controls */}
           <div className="grid grid-cols-2 gap-4 pt-4 border-t border-zinc-800/50">
             <div className="space-y-3">
               <label className="text-[10px] font-black uppercase text-zinc-500 tracking-[0.2em] flex items-center gap-2">
@@ -327,9 +299,9 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
               <select 
                 value={config.blendMode}
                 onChange={(e) => onUpdateConfig({ blendMode: e.target.value as BlendMode })}
-                className="w-full bg-black/40 border border-zinc-800 rounded-2xl p-3.5 text-[10px] font-black uppercase tracking-wider focus:ring-2 focus:ring-blue-500 outline-none appearance-none cursor-pointer text-zinc-300"
+                className="w-full bg-black/40 border border-zinc-800 rounded-2xl p-3 text-[10px] font-black uppercase tracking-wider focus:ring-2 focus:ring-blue-500 outline-none appearance-none cursor-pointer text-zinc-300"
               >
-                <option value="multiply">Multiply (Stencil)</option>
+                <option value="multiply">Multiply (Ink on Skin)</option>
                 <option value="normal">Normal</option>
                 <option value="overlay">Overlay</option>
                 <option value="darken">Darken</option>
@@ -338,7 +310,7 @@ const TattooCanvas = forwardRef<TattooCanvasHandle, TattooCanvasProps>(({
             </div>
             <div className="space-y-3">
               <label className="text-[10px] font-black uppercase text-zinc-500 tracking-[0.2em]">Opacity</label>
-              <div className="flex items-center bg-black/40 border border-zinc-800 rounded-2xl h-[46px] px-3">
+              <div className="flex items-center bg-black/40 border border-zinc-800 rounded-2xl h-[42px] px-3">
                 <input 
                   type="range" min="0.1" max="1" step="0.01" value={config.opacity}
                   onChange={(e) => onUpdateConfig({ opacity: parseFloat(e.target.value) })}
